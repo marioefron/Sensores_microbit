@@ -1,0 +1,64 @@
+// ============================================
+// MICRO:BIT ACCELEROMETER - MakeCode JavaScript
+// ============================================
+// Este código envía solo los datos del acelerómetro
+// vía Bluetooth UART en formato JSON
+
+// Configuración inicial de Bluetooth
+bluetooth.startUartService()
+basic.showIcon(IconNames.Heart)
+
+// Función para enviar datos del acelerómetro
+function sendAccelerometerData() {
+    // Leer valores del acelerómetro en los 3 ejes
+    let accelData = {
+        "accelerometer": {
+            "x": input.acceleration(Dimension.X),
+            "y": input.acceleration(Dimension.Y),
+            "z": input.acceleration(Dimension.Z)
+        }
+    }
+    
+    // Convertir a JSON y enviar por Bluetooth
+    let jsonString = JSON.stringify(accelData)
+    bluetooth.uartWriteString(jsonString + "\n")
+}
+
+// Cuando se conecta un dispositivo Bluetooth
+bluetooth.onBluetoothConnected(function () {
+    basic.showIcon(IconNames.Yes)
+    basic.pause(500)
+    basic.clearScreen()
+})
+
+// Cuando se desconecta
+bluetooth.onBluetoothDisconnected(function () {
+    basic.showIcon(IconNames.No)
+    basic.pause(500)
+    basic.showIcon(IconNames.Heart)
+})
+
+// Loop principal - envía datos cada 50ms (20 Hz)
+basic.forever(function () {
+    sendAccelerometerData()
+    basic.pause(50)
+})
+
+// OPCIONAL: Mostrar valores cuando se presiona un botón
+input.onButtonPressed(Button.A, function () {
+    basic.showNumber(input.acceleration(Dimension.X))
+    basic.pause(1000)
+    basic.clearScreen()
+})
+
+input.onButtonPressed(Button.B, function () {
+    basic.showNumber(input.acceleration(Dimension.Y))
+    basic.pause(1000)
+    basic.clearScreen()
+})
+
+input.onButtonPressed(Button.AB, function () {
+    basic.showNumber(input.acceleration(Dimension.Z))
+    basic.pause(1000)
+    basic.clearScreen()
+})
