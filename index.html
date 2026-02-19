@@ -1,71 +1,531 @@
-// ============================================
-// MICRO:BIT ACCELEROMETER - VERSIÓN MEJORADA
-// ============================================
-// Esta versión garantiza que los datos se envíen correctamente
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>micro:bit Bluetooth Debug</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-// PASO 1: Iniciar servicio Bluetooth
-bluetooth.startUartService()
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00ff88;
+            padding: 20px;
+            line-height: 1.6;
+        }
 
-// PASO 2: Mostrar que está listo
-basic.showIcon(IconNames.Heart)
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
 
-// PASO 3: Variable para almacenar el JSON
-let jsonData = ""
+        h1 {
+            color: #00d9ff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
 
-// PASO 4: Cuando se conecta Bluetooth
-bluetooth.onBluetoothConnected(function () {
-    basic.showIcon(IconNames.Yes)
-    basic.pause(500)
-    basic.clearScreen()
-    // Enviar mensaje de confirmación
-    bluetooth.uartWriteString("CONNECTED\n")
-})
+        .panel {
+            background: #1a1f3a;
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
 
-// PASO 5: Cuando se desconecta
-bluetooth.onBluetoothDisconnected(function () {
-    basic.showIcon(IconNames.No)
-    basic.pause(500)
-    basic.showIcon(IconNames.Heart)
-})
+        .panel h2 {
+            color: #ff6b35;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
 
-// PASO 6: Loop principal - Enviar datos del acelerómetro
-basic.forever(function () {
-    // Leer valores del acelerómetro
-    let x = input.acceleration(Dimension.X)
-    let y = input.acceleration(Dimension.Y)
-    let z = input.acceleration(Dimension.Z)
-    
-    // Construir JSON (forma más simple y segura)
-    jsonData = "{\"accelerometer\":{\"x\":" + x + ",\"y\":" + y + ",\"z\":" + z + "}}"
-    
-    // Enviar por Bluetooth con salto de línea
-    bluetooth.uartWriteString(jsonData + "\n")
-    
-    // Indicador visual opcional (parpadear LED esquina)
-    led.plot(4, 0)
-    
-    // Pausa de 50ms (20 Hz)
-    basic.pause(50)
-    
-    // Apagar LED
-    led.unplot(4, 0)
-})
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0d1117;
+            border-radius: 8px;
+        }
 
-// OPCIONAL: Ver valores con botones
-input.onButtonPressed(Button.A, function () {
-    basic.showNumber(input.acceleration(Dimension.X))
-    basic.pause(1000)
-    basic.clearScreen()
-})
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-input.onButtonPressed(Button.B, function () {
-    basic.showNumber(input.acceleration(Dimension.Y))
-    basic.pause(1000)
-    basic.clearScreen()
-})
+        .status-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #ff4757;
+        }
 
-input.onButtonPressed(Button.AB, function () {
-    basic.showNumber(input.acceleration(Dimension.Z))
-    basic.pause(1000)
-    basic.clearScreen()
-})
+        .status-dot.connected {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        button {
+            padding: 12px 30px;
+            background: #00d9ff;
+            color: #0a0e27;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background: #00ff88;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .log-window {
+            background: #000;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            border-left: 3px solid #00d9ff;
+            padding-left: 10px;
+        }
+
+        .log-entry.error {
+            border-left-color: #ff4757;
+            color: #ff4757;
+        }
+
+        .log-entry.success {
+            border-left-color: #00ff88;
+            color: #00ff88;
+        }
+
+        .log-entry.data {
+            border-left-color: #ffd93d;
+            color: #ffd93d;
+        }
+
+        .timestamp {
+            color: #8b949e;
+            margin-right: 10px;
+        }
+
+        .data-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .data-card {
+            background: #0d1117;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            border: 2px solid #30363d;
+        }
+
+        .data-label {
+            color: #8b949e;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .data-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+
+        .raw-data {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            word-break: break-all;
+            color: #ffd93d;
+        }
+
+        .info-box {
+            background: #1a2332;
+            border-left: 4px solid #00d9ff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h3 {
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 micro:bit Bluetooth Diagnostic Tool</h1>
+
+        <div class="info-box">
+            <h3>Instrucciones:</h3>
+            <ul>
+                <li>1. Asegúrate de que el código esté cargado en el micro:bit</li>
+                <li>2. Verifica que "No Pairing Required" esté activado en MakeCode</li>
+                <li>3. Haz clic en "Connect" y selecciona tu micro:bit</li>
+                <li>4. Observa el log para ver exactamente qué datos se están recibiendo</li>
+            </ul>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div id="deviceName" style="color: #8b949e;"></div>
+            <button id="connectBtn">Connect micro:bit</button>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Parsed Data (if JSON is valid)</h2>
+            <div class="data-display">
+                <div class="data-card">
+                    <div class="data-label">X Axis</div>
+                    <div class="data-value" id="valueX">--</div>
+                </div>
+                <div class="data-card">
+                    <div class="data-label">Y Axis</div>
+                    <div class="data-value" id="valueY">--</div>
+                </div>
+                <div class="data-card">
+                    <div class="data-label">Z Axis</div>
+                    <div class="data-value" id="valueZ">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>📡 Raw Data Received</h2>
+            <div class="controls">
+                <button id="clearBtn">Clear Log</button>
+                <button id="testBtn" disabled>Send Test Command</button>
+            </div>
+            <div class="log-window" id="logWindow"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📝 Last Raw Message</h2>
+            <div class="raw-data" id="rawData">Waiting for data...</div>
+        </div>
+
+        <div class="panel">
+            <h2>🔧 Statistics</h2>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                <div>
+                    <strong style="color: #00d9ff;">Messages Received:</strong>
+                    <span id="msgCount">0</span>
+                </div>
+                <div>
+                    <strong style="color: #00d9ff;">Valid JSON:</strong>
+                    <span id="validCount">0</span>
+                </div>
+                <div>
+                    <strong style="color: #00d9ff;">Parse Errors:</strong>
+                    <span id="errorCount">0</span>
+                </div>
+                <div>
+                    <strong style="color: #00d9ff;">Update Rate:</strong>
+                    <span id="updateRate">0 Hz</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class BluetoothDebugger {
+            constructor() {
+                this.device = null;
+                this.server = null;
+                this.serviceUUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+                this.txCharacteristicUUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+                this.rxCharacteristicUUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+                this.txCharacteristic = null;
+                this.rxCharacteristic = null;
+
+                this.stats = {
+                    messagesReceived: 0,
+                    validJSON: 0,
+                    parseErrors: 0,
+                    lastUpdate: Date.now()
+                };
+
+                this.dataBuffer = '';
+                
+                this.init();
+            }
+
+            init() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.toggleConnection());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearLog());
+                document.getElementById('testBtn').addEventListener('click', () => this.sendTestCommand());
+                
+                this.log('System initialized. Ready to connect.', 'success');
+            }
+
+            async toggleConnection() {
+                if (this.device && this.device.gatt.connected) {
+                    this.disconnect();
+                } else {
+                    await this.connect();
+                }
+            }
+
+            async connect() {
+                try {
+                    this.log('Scanning for micro:bit devices...', 'success');
+                    
+                    this.device = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { namePrefix: 'BBC micro:bit' },
+                            { namePrefix: 'micro:bit' }
+                        ],
+                        optionalServices: [this.serviceUUID]
+                    });
+
+                    this.log(`Device found: ${this.device.name}`, 'success');
+                    document.getElementById('deviceName').textContent = `Device: ${this.device.name}`;
+                    
+                    this.log('Connecting to GATT server...', 'success');
+                    this.server = await this.device.gatt.connect();
+                    
+                    this.log('Getting UART service...', 'success');
+                    const service = await this.server.getPrimaryService(this.serviceUUID);
+                    
+                    this.log('Getting characteristics...', 'success');
+                    this.txCharacteristic = await service.getCharacteristic(this.txCharacteristicUUID);
+                    this.rxCharacteristic = await service.getCharacteristic(this.rxCharacteristicUUID);
+                    
+                    this.log('Starting notifications...', 'success');
+                    await this.rxCharacteristic.startNotifications();
+                    this.rxCharacteristic.addEventListener('characteristicvaluechanged', 
+                        (event) => this.handleData(event));
+                    
+                    this.updateConnectionStatus(true);
+                    this.log('✓ CONNECTION SUCCESSFUL - Listening for data...', 'success');
+                    
+                    document.getElementById('testBtn').disabled = false;
+                    
+                    this.device.addEventListener('gattserverdisconnected', () => {
+                        this.updateConnectionStatus(false);
+                        this.log('⚠ Device disconnected', 'error');
+                        document.getElementById('testBtn').disabled = true;
+                    });
+                    
+                } catch (error) {
+                    this.log(`✗ CONNECTION ERROR: ${error.message}`, 'error');
+                    this.log(`Error details: ${error}`, 'error');
+                    this.updateConnectionStatus(false);
+                }
+            }
+
+            disconnect() {
+                if (this.device && this.device.gatt.connected) {
+                    this.device.gatt.disconnect();
+                    this.log('Disconnected manually', 'success');
+                }
+            }
+
+            handleData(event) {
+                const decoder = new TextDecoder();
+                const chunk = decoder.decode(event.target.value);
+                
+                // Add to buffer
+                this.dataBuffer += chunk;
+                
+                // Show raw chunk received
+                this.log(`RAW CHUNK: "${chunk}"`, 'data');
+                
+                // Process complete lines (ending with \n)
+                const lines = this.dataBuffer.split('\n');
+                
+                // Keep the last incomplete line in buffer
+                this.dataBuffer = lines.pop() || '';
+                
+                // Process complete lines
+                lines.forEach(line => {
+                    if (line.trim().length > 0) {
+                        this.processLine(line.trim());
+                    }
+                });
+            }
+
+            processLine(data) {
+                this.stats.messagesReceived++;
+                document.getElementById('msgCount').textContent = this.stats.messagesReceived;
+                
+                // Update rate
+                const now = Date.now();
+                const delta = (now - this.stats.lastUpdate) / 1000;
+                const rate = 1 / delta;
+                document.getElementById('updateRate').textContent = rate.toFixed(1) + ' Hz';
+                this.stats.lastUpdate = now;
+                
+                // Show raw data
+                document.getElementById('rawData').textContent = data;
+                
+                this.log(`COMPLETE MESSAGE: "${data}"`, 'data');
+                
+                // Try to parse as JSON
+                try {
+                    const parsed = JSON.parse(data);
+                    this.stats.validJSON++;
+                    document.getElementById('validCount').textContent = this.stats.validJSON;
+                    
+                    this.log(`✓ VALID JSON PARSED: ${JSON.stringify(parsed, null, 2)}`, 'success');
+                    
+                    // Update display if accelerometer data exists
+                    if (parsed.accelerometer) {
+                        document.getElementById('valueX').textContent = parsed.accelerometer.x;
+                        document.getElementById('valueY').textContent = parsed.accelerometer.y;
+                        document.getElementById('valueZ').textContent = parsed.accelerometer.z;
+                        this.log(`✓ Accelerometer data updated: X=${parsed.accelerometer.x}, Y=${parsed.accelerometer.y}, Z=${parsed.accelerometer.z}`, 'success');
+                    } else {
+                        this.log('⚠ JSON is valid but no "accelerometer" field found', 'error');
+                        this.log(`Available fields: ${Object.keys(parsed).join(', ')}`, 'data');
+                    }
+                    
+                } catch (error) {
+                    this.stats.parseErrors++;
+                    document.getElementById('errorCount').textContent = this.stats.parseErrors;
+                    
+                    this.log(`✗ JSON PARSE ERROR: ${error.message}`, 'error');
+                    this.log(`Received data was: "${data}"`, 'error');
+                    this.log(`Data length: ${data.length} characters`, 'data');
+                    this.log(`First 10 chars: "${data.substring(0, 10)}"`, 'data');
+                    this.log(`Last 10 chars: "${data.substring(data.length - 10)}"`, 'data');
+                    
+                    // Check for common issues
+                    if (!data.startsWith('{')) {
+                        this.log('⚠ Data does not start with "{"', 'error');
+                    }
+                    if (!data.endsWith('}')) {
+                        this.log('⚠ Data does not end with "}"', 'error');
+                    }
+                    if (data.includes('\\')) {
+                        this.log('⚠ Data contains backslashes - check quote escaping', 'error');
+                    }
+                }
+            }
+
+            async sendTestCommand() {
+                if (!this.txCharacteristic) {
+                    this.log('✗ Cannot send - not connected', 'error');
+                    return;
+                }
+
+                try {
+                    const encoder = new TextEncoder();
+                    await this.txCharacteristic.writeValue(encoder.encode('TEST\n'));
+                    this.log('→ Sent test command: "TEST"', 'success');
+                } catch (error) {
+                    this.log(`✗ Error sending command: ${error.message}`, 'error');
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                const connectBtn = document.getElementById('connectBtn');
+
+                if (connected) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    connectBtn.textContent = 'Disconnect';
+                } else {
+                    statusDot.classList.remove('connected');
+                    statusText.textContent = 'Disconnected';
+                    connectBtn.textContent = 'Connect micro:bit';
+                }
+            }
+
+            log(message, type = 'info') {
+                const logWindow = document.getElementById('logWindow');
+                const timestamp = new Date().toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+                
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+                
+                logWindow.appendChild(entry);
+                logWindow.scrollTop = logWindow.scrollHeight;
+                
+                // Keep only last 100 entries
+                while (logWindow.children.length > 100) {
+                    logWindow.removeChild(logWindow.firstChild);
+                }
+            }
+
+            clearLog() {
+                document.getElementById('logWindow').innerHTML = '';
+                this.stats = {
+                    messagesReceived: 0,
+                    validJSON: 0,
+                    parseErrors: 0,
+                    lastUpdate: Date.now()
+                };
+                document.getElementById('msgCount').textContent = '0';
+                document.getElementById('validCount').textContent = '0';
+                document.getElementById('errorCount').textContent = '0';
+                this.log('Log cleared', 'success');
+            }
+        }
+
+        // Check Bluetooth support
+        if (!navigator.bluetooth) {
+            document.body.innerHTML = `
+                <div style="text-align: center; padding: 50px; color: #ff4757;">
+                    <h1>⚠️ Web Bluetooth Not Supported</h1>
+                    <p>Please use Chrome, Edge, or Opera browser on desktop or Android.</p>
+                    <p>Firefox and Safari do not support Web Bluetooth API.</p>
+                </div>
+            `;
+        } else {
+            const debugger = new BluetoothDebugger();
+        }
+    </script>
+</body>
+</html>
